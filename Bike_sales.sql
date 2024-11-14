@@ -1,0 +1,141 @@
+-- DATA CLEANING
+SELECT * 
+FROM bikesales;
+
+-- FIRST WE CREATE A NEW TABLE FROM THE ORIGINAL TABLE IN ORDER TO PRESERVE THE ORIGINAL DATA AND NOT ALTER IT
+CREATE TABLE bikesales_staging
+LIKE bikesales;
+
+-- THEN IN THIS NEW TABLE WE SIMPLY COPY ALL THE DATA IN THE ORIGINAL TABLE INTO THIS NEW ONE
+INSERT INTO bikesales_staging
+SELECT *
+FROM bikesales;
+
+SELECT * 
+FROM bikesales_staging;
+
+-- NEXT WE CHECK FOR DUPLICATES
+WITH CTE_1 AS 
+(
+SELECT *, 
+ROW_NUMBER() OVER(PARTITION BY Sales_Order, `Date`, `Day`, `Month`, `Year`, Customer_Age, Age_Group, Customer_Gender, Country, 
+State, Product_Category, Sub_Category, Product_Description, Order_Quantity, Unit_Cost, Unit_Price, Profit, Cost, Revenue) AS row_num 
+FROM bikesales_staging
+)
+SELECT *
+FROM CTE_1
+WHERE row_num > 1;
+
+-- SINCE WE SEE THAT THERE ARE NO DUPLICATES WE CONTINUE CLEANING THE DATA FURTHER
+SELECT *
+FROM bikesales_staging;
+
+-- NEXT I WANT TO DELETE ROWS THAT HAS ATLEAST ONE EMPTY COLUMN
+DELETE 
+FROM bikesales_staging
+WHERE Age_Group = '';
+
+SELECT *
+FROM bikesales_staging;
+
+-- WE CHANGE CUSTOMER_GENDER BY WRITING IT OUT FULL
+UPDATE bikesales_staging
+SET Customer_Gender = 'Female'
+WHERE Customer_Gender LIKE 'F';
+
+UPDATE bikesales_staging
+SET Customer_Gender = 'Male'
+WHERE Customer_Gender LIKE 'M';
+
+-- IN THIS TABLE WE CAN CHOOSE TO DROP "PRODUCT_CATEGORY" AND "SUB_CATEGORY" BECAUSE THEY ARE ALL THE SAME AND WON'T BE REALLY USEFUL IN EXPLORATORY ANALYSIS
+ALTER TABLE bikesales_staging
+DROP Product_Category;
+
+ALTER TABLE bikesales_staging
+DROP Sub_Category;
+
+-- SINCE WE HAVE 3 DIFFERENT COLUMNS FOR DATE WE WILL DROP THE DATE COLUMN
+ALTER TABLE bikesales_staging
+DROP `DATE`;
+
+SELECT *
+FROM bikesales_staging;
+
+-- WE TRIM() THE DATA TO MAKE SURE THEY ALL HAVE THE SAME ALIGNMENT
+SELECT Country, TRIM(Country)
+FROM bikesales_staging;
+
+UPDATE bikesales_staging
+SET Country = TRIM(COUNTRY);
+
+DELETE 
+FROM bikesales_staging
+WHERE Product_Description = '';
+
+UPDATE bikesales_staging
+SET Country = 'United States'
+WHERE Country LIKE 'United  S%';
+-- EXPLORATORY ANALYSIS
+
+-- 1) WHAT STATE AND IT'S CORRESPONDING COUNTRY HAVE THE MOST SALES
+SELECT State, Country, COUNT(*)
+FROM bikesales_staging
+GROUP BY State, Country
+ORDER BY 2 DESC;
+
+UPDATE bikesales_staging
+SET `Month` = 'December'
+WHERE `Month` LIKE 'Dec%';
+
+SELECT *
+FROM bikesales_staging;
+
+SELECT `Day`, COUNT(*)
+FROM bikesales_staging
+GROUP BY `Day`;
+
+-- THEY ARE ALL OF THE SAME MONTH IN THE SAME YEAR WE WILL NOT BE MAKING USE OF THE MONTH AND YEAR BUT FOR TRANSPARENCY'S SAKE WE WILL NOT DELETE THOSE COLUMNS
+-- 2) WHAT DAY DID THEY SELL THE MOST (BY COUNT IGNORING ORDER QUANTITY) LIMIT BY 5
+SELECT `Day`, COUNT(*)
+FROM bikesales_staging
+GROUP BY `DAY`
+ORDER BY 2 DESC
+LIMIT 5;
+
+-- 3) WHAT DAY DID THEY SELL THE MOST (BY COUNT INCLUDING ORDER QUANTITY) LIMIT BY 5
+SELECT `Day`, Order_Quantity, COUNT(*)
+FROM bikesales_staging
+GROUP BY `Day`, Order_Quantity
+ORDER BY 3 DESC
+LIMIT 5;
+
+-- 4) WHAT DAY DID THEY MAKE THE MOST (BY PROFIT) TOP 5
+SELECT `Day`, Profit
+FROM bikesales_staging
+GROUP BY `Day`, Profit
+ORDER BY 2 DESC
+LIMIT 5;
+
+SELECT *
+FROM bikesales_staging;
+
+-- 5) WHAT AGE GROUP ARE BUYING THE MOST (BY COST) -- BECAUSE OF THE '$' SIGN I COULDN'T CHANGE IT TO DATA TYPE INT AND ALSO COULDN'T ADD SO I SIMPLY MANIPULATED IT USING SUBSTRINGS
+SELECT Age_Group, SUM(SUBSTRING(Cost, 2)) AS Cost
+FROM bikesales_staging
+GROUP BY Age_Group
+ORDER BY 2 DESC;
+
+-- 6) WHAT AGE GROUP ARE BUYING THE MOST (IGNORING ORDER QUANTITY) LIMIT BY 5
+SELECT Age_Group, COUNT(*)
+FROM bikesales_staging
+GROUP BY Age_Group
+ORDER BY 2 DESC
+LIMIT 5;
+
+-- 7) NUMBER OF MALE AND FEMALE
+SELECT Customer_Gender, COUNT(*)
+FROM bikesales_staging
+GROUP BY Customer_Gender;
+
+SELECT *
+FROM bikesales_staging;
